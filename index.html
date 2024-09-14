@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VideoWild</title>
+  <style>
+    video {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>VideoWild</h1>
+  <input type="file" id="fileInput" accept="video/*" multiple>
+  <div id="videoContainer"></div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const videoContainer = document.getElementById('videoContainer');
+
+    fileInput.addEventListener('change', (event) => {
+      const files = event.target.files;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const videoURL = URL.createObjectURL(file);
+        const videoElement = document.createElement('video');
+        videoElement.src = videoURL;
+        videoElement.controls = true;
+
+        const downloadButton = document.createElement('button');
+        downloadButton.textContent = 'Descargar';
+        downloadButton.addEventListener('click', () => {
+          const downloadLink = document.createElement('a');
+          downloadLink.href = videoURL;
+          downloadLink.download = file.name;
+          downloadLink.click();
+        });
+
+        const shareButton = document.createElement('button');
+        shareButton.textContent = 'Compartir';
+        shareButton.addEventListener('click', () => {
+          navigator.clipboard.writeText(videoURL)
+            .then(() => {
+              alert('Enlace copiado al portapapeles');
+            })
+            .catch((err) => {
+              console.error('Error al copiar el enlace: ', err);
+            });
+        });
+
+        const container = document.createElement('div');
+        container.appendChild(videoElement);
+        container.appendChild(downloadButton);
+        container.appendChild(shareButton);
+        videoContainer.appendChild(container);
+      }
+    });
+  </script>
+</body>
+</html>
