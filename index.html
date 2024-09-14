@@ -5,57 +5,125 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VideoWild</title>
   <style>
-    video {
+    video, img {
       max-width: 100%;
     }
   </style>
 </head>
 <body>
   <h1>VideoWild</h1>
-  <input type="file" id="fileInput" accept="video/*" multiple>
-  <div id="videoContainer"></div>
+  <input type="file" id="fileInput" accept="video/*,image/*" multiple>
+  <div id="mediaContainer"></div>
 
   <script>
     const fileInput = document.getElementById('fileInput');
-    const videoContainer = document.getElementById('videoContainer');
+    const mediaContainer = document.getElementById('mediaContainer');
+    let db;
+
+    // Función para abrir la base de datos IndexedDB
+    function openDatabase() {
+      const request = window.indexedDB.open('mediaDB', 1);
+
+      request.onerror = (event) => {
+        console.error('Error al abrir la base de datos:', event.target.errorCode);
+      };
+
+      request.onsuccess = (event) => {
+        db = event.target.result;
+        loadMedia();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        const objectStore = db.createObjectStore('media', { keyPath: 'id' });
+        objectStore.createIndex('type', 'type', { unique: false });
+      };
+    }
+
+    // Función para cargar los medios almacenados en IndexedDB
+    function loadMedia() {
+      const transaction = db.transaction(['media'], 'readonly');
+      const objectStore = transaction.objectStore('media');
+      const request = objectStore.getAll();
+
+      request.onsuccess = (event) => {
+        const storedMedia = event.target.result;
+        storedMedia.forEach(mediaData => {
+          const mediaElement = createMediaElement(mediaData.type, mediaData.data);
+          mediaContainer.appendChild(mediaElement);
+        });
+      };
+
+      request.onerror = (event) => {
+        console.error('Error al cargar los medios:', event.target.errorCode);
+      };
+    }
+
+    // Función para crear un elemento de video o imagen
+    function createMediaElement(type, data) {
+      const mediaElement = type === 'video' ? document.createElement('video') : document.createElement('img');
+      mediaElement.src = data;
+      mediaElement.controls = type === 'video';
+
+      const downloadButton = document.createElement('button');
+      downloadButton.textContent = 'Descargar';
+      downloadButton.addEventListener('click', () => {
+        const downloadLink = document.createElement('a');
+        downloadLink.href = data;
+        downloadLink.download = `media_${Date.now()}.${type}`;
+        downloadLink.click();
+      });
+
+      const shareButton = document.createElement('button');
+      shareButton.textContent = 'Compartir';
+      shareButton.addEventListener('click', () => {
+        navigator.clipboard.writeText(data)
+          .then(() => {
+            alert('Enlace copiado al portapapeles');
+          })
+          .catch((err) => {
+            console.error('Error al copiar el enlace: ', err);
+          });
+      });
+
+      const container = document.createElement('div');
+      container.appendChild(mediaElement);
+      container.appendChild(downloadButton);
+      container.appendChild(shareButton);
+      return container;
+    }
 
     fileInput.addEventListener('change', (event) => {
       const files = event.target.files;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const videoURL = URL.createObjectURL(file);
-        const videoElement = document.createElement('video');
-        videoElement.src = videoURL;
-        videoElement.controls = true;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const mediaData = {
+            id: Date.now(), // Usar un identificador único
+            type: file.type.includes('video') ? 'video' : 'image',
+            data: reader.result
+          };
 
-        const downloadButton = document.createElement('button');
-        downloadButton.textContent = 'Descargar';
-        downloadButton.addEventListener('click', () => {
-          const downloadLink = document.createElement('a');
-          downloadLink.href = videoURL;
-          downloadLink.download = file.name;
-          downloadLink.click();
-        });
+          const transaction = db.transaction(['media'], 'readwrite');
+          const objectStore = transaction.objectStore('media');
+          const request = objectStore.add(mediaData);
 
-        const shareButton = document.createElement('button');
-        shareButton.textContent = 'Compartir';
-        shareButton.addEventListener('click', () => {
-          navigator.clipboard.writeText(videoURL)
-            .then(() => {
-              alert('Enlace copiado al portapapeles');
-            })
-            .catch((err) => {
-              console.error('Error al copiar el enlace: ', err);
-            });
-        });
+          request.onsuccess = () => {
+            const mediaElement = createMediaElement(mediaData.type, mediaData.data);
+            mediaContainer.appendChild(mediaElement);
+          };
 
-        const container = document.createElement('div');
-        container.appendChild(videoElement);
-        container.appendChild(downloadButton);
-        container.appendChild(shareButton);
-        videoContainer.appendChild(container);
+          request.onerror = (event) => {
+            console.error('Error al almacenar el medio:', event.target.errorCode);
+          };
+        };
+        reader.readAsDataURL(file);
       }
     });
+
+    // Abrir la base de datos IndexedDB al cargar la página
+    openDatabase();
   </script>
 </body>
 </html>
